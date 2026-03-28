@@ -204,6 +204,20 @@ CONVERSATION HISTORY:
 ${conversationHistory || "No previous messages."}
 `;
 
+  const source =
+    options?.source === "telegram" ? MessageSource.TELEGRAM : MessageSource.WEB;
+
+  await db.conversationMessage.create({
+    data: {
+      tripId,
+      role: MessageRole.USER,
+      content: userMessage,
+      source,
+      senderName: options?.senderName,
+      telegramMessageId: options?.telegramMessageId,
+    },
+  });
+
   const response = await openai.responses.create({
     model: env.OPENAI_MODEL,
     instructions: system,
@@ -221,21 +235,6 @@ ${conversationHistory || "No previous messages."}
       dedupedJobs.push(job);
     }
   }
-
-  const source =
-    options?.source === "telegram" ? MessageSource.TELEGRAM : MessageSource.WEB;
-
-  await db.conversationMessage.create({
-    data: {
-      tripId,
-      role: MessageRole.USER,
-      content: userMessage,
-      metadata: parsed.extractedIntents,
-      source,
-      senderName: options?.senderName,
-      telegramMessageId: options?.telegramMessageId,
-    },
-  });
 
   await db.conversationMessage.create({
     data: {

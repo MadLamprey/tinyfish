@@ -45,58 +45,68 @@ async function tinyfishFetch(path: string, init: RequestInit) {
   return response;
 }
 
+const SCRAPE_TIMEOUT_MS = 120_000;
+
 export async function scrapeSingle(
   url: string,
   goal: string,
   options?: TinyFishOptions,
 ): Promise<unknown> {
-  const response = await tinyfishFetch("/v1/automation/run-sse", {
-    method: "POST",
-    body: JSON.stringify(buildBody(url, goal, options)),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT_MS);
 
-  const reader = response.body?.getReader();
+  try {
+    const response = await tinyfishFetch("/v1/automation/run-sse", {
+      method: "POST",
+      body: JSON.stringify(buildBody(url, goal, options)),
+      signal: controller.signal,
+    });
 
-  if (!reader) {
-    throw new Error("TinyFish SSE stream missing body");
-  }
+    const reader = response.body?.getReader();
 
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { value, done } = await reader.read();
-
-    if (done) {
-      break;
+    if (!reader) {
+      throw new Error("TinyFish SSE stream missing body");
     }
 
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split("\n\n");
-    buffer = chunks.pop() ?? "";
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    for (const chunk of chunks) {
-      const line = chunk
-        .split("\n")
-        .find((candidate) => candidate.trim().startsWith("data:"));
+    while (true) {
+      const { value, done } = await reader.read();
 
-      if (!line) {
-        continue;
+      if (done) {
+        break;
       }
 
-      const payload = JSON.parse(line.replace(/^data:\s*/, ""));
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() ?? "";
 
-      if (
-        payload.type === "COMPLETE" &&
-        payload.status === "COMPLETED" &&
-        payload.result
-      ) {
-        return payload.result;
+      for (const chunk of chunks) {
+        const line = chunk
+          .split("\n")
+          .find((candidate) => candidate.trim().startsWith("data:"));
+
+        if (!line) {
+          continue;
+        }
+
+        const payload = JSON.parse(line.replace(/^data:\s*/, ""));
+
+        if (
+          payload.type === "COMPLETE" &&
+          payload.status === "COMPLETED" &&
+          payload.result
+        ) {
+          return payload.result;
+        }
       }
     }
-  }
 
-  throw new Error("TinyFish SSE stream ended without a completed result");
+    throw new Error("TinyFish SSE stream ended without a completed result");
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function scrapeBatch(

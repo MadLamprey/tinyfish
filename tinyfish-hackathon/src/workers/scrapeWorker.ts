@@ -102,35 +102,38 @@ new Worker(
         );
         const embedding = await generateEmbedding(`${title}\n${description}`);
 
-        await db.$executeRawUnsafe(
-          `INSERT INTO "KnowledgeEntry"
-          ("id","tripId","scrapeJobId","category","title","description","sourceUrl","sourcePlatform","location","tags","imageUrls","rawData","confidence","createdAt","updatedAt","embedding")
-          VALUES
-          (gen_random_uuid()::text,$1,$2,$3::"PlaceCategory",$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW(),$13::vector)`,
-          scrapeJob.tripId,
-          scrapeJob.id,
-          inferCategory(scrapeJob.platform, rawItem),
-          title,
-          description,
-          String(rawItem.url ?? rawItem.sourceUrl ?? scrapeJob.targetUrl),
-          scrapeJob.platform,
-          JSON.stringify({
-            address: rawItem.address ?? null,
-            neighborhood: rawItem.neighborhood ?? null,
-            city: rawItem.city ?? null,
-            lat: rawItem.lat ?? null,
-            lng: rawItem.lng ?? null,
-          }),
-          Array.isArray(rawItem.tags) ? rawItem.tags : [],
-          Array.isArray(rawItem.image_urls)
-            ? rawItem.image_urls
-            : rawItem.image_url
-              ? [rawItem.image_url]
-              : [],
-          JSON.stringify(rawItem),
-          0.6,
-          `[${embedding.join(",")}]`,
-        );
+        const entry = await db.knowledgeEntry.create({
+          data: {
+            tripId: scrapeJob.tripId,
+            scrapeJobId: scrapeJob.id,
+            category: inferCategory(scrapeJob.platform, rawItem),
+            title,
+            description,
+            sourceUrl: String(rawItem.url ?? rawItem.sourceUrl ?? scrapeJob.targetUrl),
+            sourcePlatform: scrapeJob.platform,
+            location: {
+              address: rawItem.address ?? null,
+              neighborhood: rawItem.neighborhood ?? null,
+              city: rawItem.city ?? null,
+              lat: rawItem.lat ?? null,
+              lng: rawItem.lng ?? null,
+            },
+            tags: Array.isArray(rawItem.tags) ? (rawItem.tags as string[]) : [],
+            imageUrls: Array.isArray(rawItem.image_urls)
+              ? (rawItem.image_urls as string[])
+              : rawItem.image_url
+                ? [String(rawItem.image_url)]
+                : [],
+            rawData: rawItem,
+            confidence: 0.6,
+          },
+        });
+
+        await db.$executeRaw`
+          UPDATE "KnowledgeEntry"
+          SET embedding = ${`[${embedding.join(",")}]`}::vector
+          WHERE id = ${entry.id}
+        `;
       }
 
       await db.scrapeJob.update({

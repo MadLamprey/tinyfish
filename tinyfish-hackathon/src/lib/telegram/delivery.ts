@@ -64,11 +64,13 @@ export async function sendTelegramRecommendations(
   );
 
   if (!response.ok) {
-    await db.telegramSync.updateMany({
-      where: { tripId },
-      data: { isActive: false },
-    });
-    throw new Error("Telegram delivery failed");
+    if (response.status === 401 || response.status === 403) {
+      await db.telegramSync.updateMany({
+        where: { tripId },
+        data: { isActive: false },
+      });
+    }
+    throw new Error(`Telegram delivery failed: ${response.status}`);
   }
 
   await db.recommendation.updateMany({

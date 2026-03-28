@@ -33,19 +33,22 @@ new Worker(
       orderBy: { updatedAt: "desc" },
     });
 
-    const seen = new Map<string, string>();
+    const seenByUrl = new Map<string, string>();
+    const seenByTitle = new Map<string, string>();
 
     for (const entry of entries) {
-      const key = `${entry.title.toLowerCase()}::${entry.sourceUrl.toLowerCase()}`;
+      const urlKey = `${entry.title.toLowerCase()}::${entry.sourceUrl.toLowerCase()}`;
+      const titleKey = entry.title.toLowerCase().trim();
 
-      if (seen.has(key)) {
+      if (seenByUrl.has(urlKey) || seenByTitle.has(titleKey)) {
         await db.knowledgeEntry.delete({
           where: { id: entry.id },
         });
         continue;
       }
 
-      seen.set(key, entry.id);
+      seenByUrl.set(urlKey, entry.id);
+      seenByTitle.set(titleKey, entry.id);
 
       await db.knowledgeEntry.update({
         where: { id: entry.id },

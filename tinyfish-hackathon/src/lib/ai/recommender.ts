@@ -118,9 +118,13 @@ Return JSON only:
   });
 
   const rawText = response.output_text;
-  const parsed = JSON.parse(rawText) as {
-    recommendations?: Array<{ knowledgeEntryId: string; reason: string }>;
-  };
+  let parsed: { recommendations?: Array<{ knowledgeEntryId: string; reason: string }> };
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    console.error("Recommender: failed to parse LLM response", rawText);
+    return [];
+  }
 
   const created = await Promise.all(
     (parsed.recommendations ?? []).slice(0, 5).map((item) =>
