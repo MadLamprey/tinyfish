@@ -1,6 +1,7 @@
 import { Worker } from "bullmq";
 import { db } from "@/lib/db";
 import { redis } from "@/lib/redis";
+import { recommendationQueue } from "@/lib/queue";
 
 function confidenceScore(
   sourcePlatform: string,
@@ -61,6 +62,8 @@ new Worker(
         },
       });
     }
+
+    await recommendationQueue.add("generate-recommendations", { tripId });
   },
   {
     connection: redis,

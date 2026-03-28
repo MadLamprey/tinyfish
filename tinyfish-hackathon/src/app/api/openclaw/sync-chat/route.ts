@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     const result = await processUserMessage(body.tripId, synthesized, {
       source: "telegram",
       senderName: "group",
+      skipUserMessageCreation: true,
     });
 
     await cacheTelegramReply(body.tripId, result.assistantReply);

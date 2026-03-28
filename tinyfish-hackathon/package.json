@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev & tsx src/workers/index.ts & wait",
+    "dev:next": "next dev",
+    "workers": "tsx src/workers/index.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

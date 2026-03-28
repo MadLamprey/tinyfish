@@ -10,9 +10,21 @@ export async function GET(
     const jobs = await db.scrapeJob.findMany({
       where: { tripId: params.tripId },
       orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { knowledgeEntries: true } },
+      },
     });
 
-    return NextResponse.json(jobs);
+    return NextResponse.json(
+      jobs.map((j) => ({
+        id: j.id,
+        platform: j.platform,
+        status: j.status,
+        completedAt: j.completedAt,
+        errorMessage: j.errorMessage,
+        entryCount: j._count.knowledgeEntries,
+      })),
+    );
   } catch {
     return serverError();
   }

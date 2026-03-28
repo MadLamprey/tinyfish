@@ -67,7 +67,7 @@ export async function generateRecommendationsForTrip(tripId: string) {
     },
   });
 
-  if (!trip || trip.status !== TripStatus.ACTIVE) {
+  if (!trip || trip.status === TripStatus.COMPLETED) {
     return [];
   }
 

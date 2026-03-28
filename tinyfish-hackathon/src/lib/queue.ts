@@ -23,7 +23,10 @@ export const batchScrapeQueue = new Queue<
   "batch-scrape"
 >("batch-scrape", {
   connection: redis,
-  defaultJobOptions,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    attempts: 1, // never retry — re-submits duplicate runs to TinyFish
+  },
 });
 
 export const normalizeQueue = new Queue<

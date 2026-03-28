@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { ScrapeIndicator } from "@/components/chat/ScrapeIndicator";
 import { Button } from "@/components/ui/button";
@@ -15,18 +15,89 @@ type Message = {
   senderName?: string | null;
 };
 
+type ScrapeJob = {
+  id: string;
+  platform: string;
+  status: string;
+  entryCount: number;
+};
+
 export function ChatWindow({
   tripId,
   initialMessages,
-  runningJobs,
 }: {
   tripId: string;
   initialMessages: Message[];
-  runningJobs: number;
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [scrapeJobs, setScrapeJobs] = useState<ScrapeJob[]>([]);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMessageTimestampRef = useRef<string | null>(null);
+  const prevJobStatusesRef = useRef<Record<string, string>>({});
+
+  function startPolling() {
+    if (pollingRef.current) return;
+    pollingRef.current = setInterval(() => void pollJobs(), 2_000);
+  }
+
+  function stopPolling() {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }
+
+  async function pollJobs() {
+    try {
+      const res = await fetch(`/api/trips/${tripId}/scrape-jobs`);
+      const jobs = (await res.json()) as ScrapeJob[];
+      setScrapeJobs(jobs);
+
+      // Detect any job that just finished since last poll
+      const prev = prevJobStatusesRef.current;
+      const justFinished = jobs.filter(
+        (j) =>
+          (j.status === "COMPLETED" || j.status === "FAILED") &&
+          prev[j.id] === "RUNNING",
+      );
+      prevJobStatusesRef.current = Object.fromEntries(jobs.map((j) => [j.id, j.status]));
+
+      if (justFinished.length > 0) {
+        await fetchNewMessages();
+      }
+
+      if (jobs.every((j) => j.status !== "RUNNING")) {
+        stopPolling();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function fetchNewMessages() {
+    try {
+      const since = lastMessageTimestampRef.current;
+      const url = `/api/trips/${tripId}/messages${since ? `?since=${encodeURIComponent(since)}` : ""}`;
+      const res = await fetch(url);
+      const newMessages = (await res.json()) as Message[];
+      if (newMessages.length > 0) {
+        lastMessageTimestampRef.current =
+          newMessages[newMessages.length - 1].id;
+        setMessages((current) => {
+          const existingIds = new Set(current.map((m) => m.id));
+          return [...current, ...newMessages.filter((m) => !existingIds.has(m.id))];
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
 
   async function handleSubmit() {
     if (!input.trim()) return;
@@ -48,20 +119,38 @@ export function ChatWindow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: nextInput }),
       });
-      const payload = await response.json();
+      const payload = (await response.json()) as {
+        assistantReply: string;
+        scrapeJobsToLaunch: unknown[];
+      };
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: "ASSISTANT",
+        content: payload.assistantReply,
+        source: "WEB",
+      };
 
       setMessages((current) => [
         ...current.filter((item) => item.id !== optimisticMessage.id),
         optimisticMessage,
-        {
-          id: crypto.randomUUID(),
-          role: "ASSISTANT",
-          content: payload.assistantReply,
-          source: "WEB",
-        },
+        assistantMessage,
       ]);
+
+      // Record this message's position so polling knows what's "new"
+      lastMessageTimestampRef.current = assistantMessage.id;
+
+      if (payload.scrapeJobsToLaunch?.length) {
+        // Kick off an immediate poll to populate job list, then keep polling
+        await pollJobs();
+        startPolling();
+      }
     });
   }
+
+  const activeJobs = scrapeJobs.filter(
+    (j) => j.status === "RUNNING" || j.status === "COMPLETED" || j.status === "FAILED",
+  );
 
   return (
     <div className="grid gap-4">
@@ -72,7 +161,7 @@ export function ChatWindow({
             Web messages and Telegram sync land in one shared planning timeline.
           </p>
         </div>
-        <ScrapeIndicator count={runningJobs} />
+        <ScrapeIndicator jobs={activeJobs} />
       </div>
       <Card className="grid gap-5 overflow-hidden p-0">
         <div className="border-b border-[var(--line)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),transparent)] px-6 py-4">

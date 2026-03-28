@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { badRequest, serverError } from "@/lib/http";
+import { badRequest, requireSessionUser, serverError, unauthorized } from "@/lib/http";
 import { telegramLinkSchema } from "@/lib/validations";
 
 export async function POST(
@@ -8,6 +8,9 @@ export async function POST(
   { params }: { params: { tripId: string } },
 ) {
   try {
+    const userId = await requireSessionUser();
+    if (!userId) return unauthorized();
+
     const body = telegramLinkSchema.parse(await request.json());
 
     const trip = await db.trip.update({
@@ -44,6 +47,9 @@ export async function DELETE(
   { params }: { params: { tripId: string } },
 ) {
   try {
+    const userId = await requireSessionUser();
+    if (!userId) return unauthorized();
+
     await db.trip.update({
       where: { id: params.tripId },
       data: {

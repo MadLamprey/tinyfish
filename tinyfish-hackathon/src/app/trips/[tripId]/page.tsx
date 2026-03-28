@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarRange, Compass, MessageCircleMore, Sparkles } from "lucide-react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
-import { KnowledgeGrid } from "@/components/knowledge/KnowledgeGrid";
-import { RecommendationTimeline } from "@/components/recommendations/RecommendationTimeline";
+import { LiveDiscoveries } from "@/components/knowledge/LiveDiscoveries";
+import { LiveRecommendations } from "@/components/recommendations/LiveRecommendations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -105,7 +105,6 @@ export default async function TripPage({
         <div className="grid gap-6">
           <ChatWindow
             tripId={trip.id}
-            runningJobs={trip.scrapeJobs.length}
             initialMessages={trip.messages.map((message) => ({
               id: message.id,
               role: message.role,
@@ -126,8 +125,9 @@ export default async function TripPage({
               </div>
               <Compass className="h-5 w-5 text-[var(--brand-300)]" />
             </div>
-            <KnowledgeGrid
-              entries={trip.knowledgeEntries.map((entry) => ({
+            <LiveDiscoveries
+              tripId={trip.id}
+              initialEntries={trip.knowledgeEntries.map((entry) => ({
                 id: entry.id,
                 title: entry.title,
                 category: entry.category,
@@ -144,7 +144,19 @@ export default async function TripPage({
                 Ranked moments ready to be accepted, dismissed, or turned into trip mode cards.
               </p>
             </div>
-            <RecommendationTimeline recommendations={trip.recommendations} />
+            <LiveRecommendations
+              tripId={trip.id}
+              initialRecommendations={trip.recommendations.map((rec) => ({
+                id: rec.id,
+                reason: rec.reason,
+                status: rec.status,
+                knowledgeEntry: {
+                  title: rec.knowledgeEntry.title,
+                  category: rec.knowledgeEntry.category,
+                  sourcePlatform: rec.knowledgeEntry.sourcePlatform,
+                },
+              }))}
+            />
           </Card>
         </div>
       </section>
