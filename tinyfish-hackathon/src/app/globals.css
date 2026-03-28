@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #07111f;
+  --foreground: #f4f7fb;
+  --muted-foreground: #8ca1ba;
+  --card: rgba(10, 23, 43, 0.72);
+  --card-strong: rgba(10, 23, 43, 0.88);
+  --line: rgba(255, 255, 255, 0.11);
+  --brand-100: #eef8ff;
+  --brand-300: #8bd8ff;
+  --brand-400: #57c6ff;
+  --brand-500: #1094d6;
+  --brand-600: #0c79af;
+  --accent: #72e0bb;
+  --warm: #ffc67a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(77, 176, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 85% 12%, rgba(255, 198, 122, 0.12), transparent 22%),
+    radial-gradient(circle at 60% 100%, rgba(114, 224, 187, 0.08), transparent 25%),
+    linear-gradient(180deg, #07111f 0%, #0d1d35 52%, #07111f 100%);
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading), sans-serif;
+}
+
+::selection {
+  background: rgba(87, 198, 255, 0.28);
+}

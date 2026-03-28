@@ -1,0 +1,181 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  avatarUrl    String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  trips        Trip[]
+}
+
+model Trip {
+  id                String                @id @default(cuid())
+  userId            String
+  user              User                  @relation(fields: [userId], references: [id])
+  title             String
+  destinationCities String[]
+  startDate         DateTime
+  endDate           DateTime
+  travelerCount     Int
+  vibes             String[]
+  status            TripStatus            @default(PLANNING)
+  timezone          String
+  telegramChatId    String?               @unique
+  telegramChatTitle String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  messages          ConversationMessage[]
+  scrapeJobs        ScrapeJob[]
+  knowledgeEntries  KnowledgeEntry[]
+  recommendations   Recommendation[]
+
+  @@index([userId, status])
+}
+
+enum TripStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+}
+
+model ConversationMessage {
+  id                String        @id @default(cuid())
+  tripId            String
+  trip              Trip          @relation(fields: [tripId], references: [id])
+  role              MessageRole
+  content           String        @db.Text
+  metadata          Json?
+  source            MessageSource @default(WEB)
+  senderName        String?
+  telegramMessageId Int?
+  createdAt         DateTime      @default(now())
+
+  @@index([tripId, createdAt])
+  @@index([tripId, telegramMessageId])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+enum MessageSource {
+  WEB
+  TELEGRAM
+}
+
+model ScrapeJob {
+  id               String           @id @default(cuid())
+  tripId           String
+  trip             Trip             @relation(fields: [tripId], references: [id])
+  platform         String
+  targetUrl        String
+  goal             String           @db.Text
+  tinyfishRunId    String?
+  status           ScrapeStatus     @default(PENDING)
+  resultRaw        Json?
+  errorMessage     String?          @db.Text
+  createdAt        DateTime         @default(now())
+  completedAt      DateTime?
+  knowledgeEntries KnowledgeEntry[]
+
+  @@index([tripId, status, createdAt])
+}
+
+enum ScrapeStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model KnowledgeEntry {
+  id              String                  @id @default(cuid())
+  tripId          String
+  trip            Trip                    @relation(fields: [tripId], references: [id])
+  scrapeJobId     String?
+  scrapeJob       ScrapeJob?              @relation(fields: [scrapeJobId], references: [id])
+  category        PlaceCategory
+  title           String
+  description     String                  @db.Text
+  sourceUrl       String
+  sourcePlatform  String
+  location        Json?
+  priceLevel      PriceLevel?
+  openingHours    Json?
+  tags            String[]
+  rating          Float?
+  imageUrls       String[]
+  embedding       Unsupported("vector(1536)")?
+  rawData         Json
+  confidence      Float
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  recommendations Recommendation[]
+
+  @@index([tripId, category])
+  @@index([sourcePlatform])
+}
+
+enum PlaceCategory {
+  RESTAURANT
+  BAR
+  CLUB
+  ACTIVITY
+  ATTRACTION
+  CAFE
+  SHOPPING
+  EVENT
+  OTHER
+}
+
+enum PriceLevel {
+  FREE
+  BUDGET
+  MID
+  SPLURGE
+}
+
+model Recommendation {
+  id               String               @id @default(cuid())
+  tripId           String
+  trip             Trip                 @relation(fields: [tripId], references: [id])
+  knowledgeEntryId String
+  knowledgeEntry   KnowledgeEntry       @relation(fields: [knowledgeEntryId], references: [id])
+  recommendedFor   DateTime
+  reason           String               @db.Text
+  status           RecommendationStatus @default(PENDING)
+  deliveredTo      String[]
+  createdAt        DateTime             @default(now())
+
+  @@index([tripId, status, recommendedFor])
+}
+
+enum RecommendationStatus {
+  PENDING
+  SHOWN
+  ACCEPTED
+  DISMISSED
+}
+
+model TelegramSync {
+  id              String   @id @default(cuid())
+  tripId          String   @unique
+  chatId          String
+  lastProcessedAt DateTime @default(now())
+  lastMessageId   Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
